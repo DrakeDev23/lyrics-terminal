@@ -1,4 +1,5 @@
 
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_HELPER="$SCRIPT_DIR/yt_lyrics_helper.py"
 
@@ -14,12 +15,12 @@ BLUE='\033[38;5;75m'
 show_banner() {
   clear
   echo -e "${CYAN}${BOLD}"
-  echo "  ██╗  ██╗████████╗    ██╗  ██╗ █████╗ ██╗██╗  ██╗███████╗"
-  echo "  ╚██╗██╔╝╚══██╔══╝    ██║ ██╔╝██╔══██╗██║██║ ██╔╝██╔════╝"
-  echo "   ╚███╔╝    ██║       █████╔╝ ███████║██║█████╔╝ ███████╗ "
-  echo "   ██╔██╗    ██║       ██╔═██╗ ██╔══██║██║██╔═██╗ ╚════██║ "
-  echo "  ██╔╝ ██╗   ██║       ██║  ██╗██║  ██║██║██║  ██╗███████║ "
-  echo "  ╚═╝  ╚═╝   ╚═╝       ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚══════╝"
+  echo "  ██████╗ ██████╗  █████╗ ██╗  ██╗ ██████╗ ███╗   ██╗"
+  echo "  ██╔══██╗██╔══██╗██╔══██╗██║ ██╔╝██╔═══██╗████╗  ██║"
+  echo "  ██║  ██║██████╔╝███████║█████╔╝ ██║   ██║██╔██╗ ██║"
+  echo "  ██║  ██║██╔══██╗██╔══██║██╔═██╗ ██║   ██║██║╚██╗██║"
+  echo "  ██████╔╝██║  ██║██║  ██║██║  ██╗╚██████╔╝██║ ╚████║"
+  echo "  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝"
   echo -e "${RESET}"
   echo -e "${DIM}  ♪ Real-time lyrics from YouTube — ASCII Terminal Edition ♪${RESET}"
   echo -e "${DIM}  ─────────────────────────────────────────────────────────${RESET}"
@@ -29,41 +30,45 @@ show_banner() {
 get_youtube_title() {
   local title=""
 
-  title=$(xdotool search --name "Mozilla Firefox" getwindowname 2>/dev/null | \
-    grep -i "youtube" | head -1 | sed 's/ - Mozilla Firefox//' | sed 's/ - YouTube//')
+  declare -A browsers=(
+    ["Brave"]="Brave"
+    ["Firefox"]="Mozilla Firefox"
+    ["Chromium"]="Chromium"
+    ["Chrome"]="Google Chrome"
+    ["Edge"]="Microsoft Edge"
+    ["Opera"]="Opera"
+    ["Vivaldi"]="Vivaldi"
+    ["Zen"]="Zen Browser"
+    ["Waterfox"]="Waterfox"
+    ["LibreWolf"]="LibreWolf"
+  )
+
+  for browser in "${!browsers[@]}"; do
+    local pattern="${browsers[$browser]}"
+    local found
+    found=$(xdotool search --name "$pattern" getwindowname 2>/dev/null | \
+      grep -i "youtube" | head -1)
+
+    if [[ -n "$found" ]]; then
+      title=$(echo "$found" | \
+        sed "s/ - ${pattern}//" | \
+        sed 's/ - YouTube//' | \
+        sed 's/ | YouTube//' | \
+        sed 's/YouTube - //')
+      break
+    fi
+  done
 
   if [[ -z "$title" ]]; then
-    title=$(xdotool search --name "Chromium" getwindowname 2>/dev/null | \
-      grep -i "youtube" | head -1 | sed 's/ - Chromium//' | sed 's/ - YouTube//')
-  fi
-
-  if [[ -z "$title" ]]; then
-    title=$(xdotool search --name "Google Chrome" getwindowname 2>/dev/null | \
-      grep -i "youtube" | head -1 | sed 's/ - Google Chrome//' | sed 's/ - YouTube//')
+    title=$(wmctrl -l 2>/dev/null | grep -i "youtube" | head -1 | \
+      awk '{$1=$2=$3=""; print $0}' | \
+      sed 's/^ *//' | \
+      sed 's/ - YouTube//' | \
+      sed 's/ | YouTube//' | \
+      sed 's/YouTube - //')
   fi
 
   echo "$title"
-}
-
-draw_box() {
-  local text="$1"
-  local width=60
-  local border="${BLUE}$(printf '─%.0s' $(seq 1 $width))${RESET}"
-  echo -e "${BLUE}╭${border}╮${RESET}"
-  echo "$text" | while IFS= read -r line; do
-    echo "$line" | fold -s -w $((width - 2)) | while IFS= read -r wrapped; do
-      printf "${BLUE}│${RESET} %-*s ${BLUE}│${RESET}\n" $((width - 2)) "$wrapped"
-    done
-  done
-  echo -e "${BLUE}╰${border}╯${RESET}"
-}
-
-fetch_and_display_lyrics() {
-  local song_title="$1"
-  echo -e "${YELLOW}${BOLD}  ♪ Now Searching:${RESET} ${GREEN}${song_title}${RESET}"
-  echo ""
-
-  python3 "$PYTHON_HELPER" "$song_title"
 }
 
 spinner() {
@@ -79,13 +84,22 @@ spinner() {
   printf "\r%-30s\r" " "
 }
 
+fetch_and_display_lyrics() {
+  local song_title="$1"
+  echo -e "${YELLOW}${BOLD}  ♪ Now Searching:${RESET} ${GREEN}${song_title}${RESET}"
+  echo ""
+  python3 "$PYTHON_HELPER" "$song_title"
+}
+
 main() {
   show_banner
 
-  local last_title=""
-
-  echo -e "${DIM}  Watching for YouTube music... (Ctrl+C to quit)${RESET}"
+  local session_type="${XDG_SESSION_TYPE:-unknown}"
+  echo -e "${DIM}  Session: ${session_type} | Watching all browsers for YouTube...${RESET}"
+  echo -e "${DIM}  (Ctrl+C to quit)${RESET}"
   echo ""
+
+  local last_title=""
 
   while true; do
     local current_title
