@@ -45,8 +45,20 @@ def clean_title(title):
 
     title = re.sub(r'｜.*$', '', title)
 
- 
-    word_noise = [r'MV', r'M/V', r'HD', r'HQ', r'4K', r'Official']
+    if re.search(r'Lyrics\s+by', title, flags=re.IGNORECASE) and ' - ' in title:
+        prefix, rest = title.split(' - ', 1)
+        if len(prefix.split()) <= 5:
+            debug(f"clean_title: dropping leading channel tag '{prefix}'")
+            title = rest
+
+  
+    m = re.search(r'^(.*?)\s+Lyrics\s+by\s+(.*?)(?:\s+Cover)?$', title, flags=re.IGNORECASE)
+    if m:
+        song_part, artist_part = m.group(1).strip(), m.group(2).strip()
+        title = f"{artist_part} {song_part}"
+        debug(f"clean_title: matched 'Lyrics by' pattern -> song='{song_part}' artist='{artist_part}'")
+
+    word_noise = [r'MV', r'M/V', r'HD', r'HQ', r'4K', r'Official', r'Cover', r'Lyrics']
     for word in word_noise:
         title = re.sub(rf'\b{word}\b', '', title, flags=re.IGNORECASE)
 
@@ -91,17 +103,6 @@ def is_player_playing():
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None  
 
-
-    """Parse LRC format into list of (seconds, line) tuples."""
-    lines = []
-    pattern = re.compile(r'\[(\d+):(\d+)\.(\d+)\](.*)')
-    for raw in lrc_text.split('\n'):
-        m = pattern.match(raw.strip())
-        if m:
-            minutes, seconds, centiseconds, text = m.groups()
-            total = int(minutes)*60 + int(seconds) + int(centiseconds)/100
-            lines.append((total, text.strip()))
-    return sorted(lines, key=lambda x: x[0])
 
 def parse_lrc(lrc_text):
     """Parse LRC format into list of (seconds, line) tuples."""
@@ -150,7 +151,7 @@ def display_synced(lrc_lines):
             end = min(len(lrc_lines), current_idx + window)
 
             print("\033[H\033[J", end="")
-            print(f"\n{CYAN}{BOLD}  ♪ YT-Karaoke — ASCII Terminal Lyrics ♪{RESET}\n")
+            print(f"\n{CYAN}{BOLD}  YT Karaoke  ASCII Terminal Lyrics {RESET}\n")
             print(f"{DIM}  ─────────────────────────────────────────────────{RESET}\n")
 
             for i in range(start, end):
@@ -225,7 +226,7 @@ def main():
     print(f"\n{CYAN}  Searching for:{RESET} {BOLD}{title}{RESET}")
 
     if not title:
-        print(f"  {MAGENTA}✗ Title became empty after cleaning — nothing to search for.{RESET}")
+        print(f"  {MAGENTA} Title became empty after cleaning  nothing to search for.{RESET}")
         print(f"  {DIM}  Try running with YT_LYRICS_DEBUG=1 to see why.{RESET}")
         return
 
@@ -245,20 +246,20 @@ def main():
             if looks_synced:
                 parsed = parse_lrc(lrc)
                 if parsed:
-                    print(f"  {GREEN}✓ Synced lyrics found! Starting karaoke mode...{RESET}")
+                    print(f"  {GREEN} Synced lyrics found! Starting karaoke mode...{RESET}")
                     time.sleep(1)
                     display_synced(parsed)
                     return
                 else:
-                    debug("Looked synced but parse_lrc returned no lines — falling back to plain display")
-            print(f"  {GREEN}✓ Lyrics found!{RESET}\n")
+                    debug("Looked synced but parse_lrc returned no lines falling back to plain display")
+            print(f"  {GREEN}Lyrics found!{RESET}\n")
             display_plain(lrc)
         else:
-            print(f"  {MAGENTA}✗ No lyrics found for: {title}{RESET}")
+            print(f"  {MAGENTA}No lyrics found for: {title}{RESET}")
             print(f"  {DIM}  Try searching manually: https://genius.com{RESET}")
             print(f"  {DIM}  Or rerun with YT_LYRICS_DEBUG=1 for details.{RESET}")
     except Exception as e:
-        print(f"  {MAGENTA}✗ Error fetching lyrics: {e}{RESET}")
+        print(f"  {MAGENTA}Error fetching lyrics: {e}{RESET}")
         if DEBUG:
             import traceback
             traceback.print_exc()

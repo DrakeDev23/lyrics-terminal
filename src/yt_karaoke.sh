@@ -42,8 +42,8 @@ check_dependencies() {
   fi
 
   if [[ "$HAVE_PLAYERCTL" == "0" ]]; then
-    echo -e "${MAGENTA}  ⚠ playerctl not found — this is the recommended detection${RESET}"
-    echo -e "${MAGENTA}    method, especially on Wayland. Falling back to window-title${RESET}"
+    echo -e "${MAGENTA}  ⚠ playerctl not found this is the recommended detection${RESET}"
+    echo -e "${MAGENTA}    method, especially on Wayland. Falling back to window title${RESET}"
     echo -e "${MAGENTA}    detection, which does NOT work on Wayland sessions.${RESET}"
     echo ""
   fi
@@ -59,7 +59,7 @@ show_banner() {
   echo "  ██████╔╝██║  ██║██║  ██║██║  ██╗╚██████╔╝██║ ╚████║"
   echo "  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝"
   echo -e "${RESET}"
-  echo -e "${DIM}  ♪ Real-time lyrics from YouTube — ASCII Terminal Edition ♪${RESET}"
+  echo -e "${DIM}  Real time lyrics from YouTube ASCII Terminal Edition ${RESET}"
   echo -e "${DIM}  ─────────────────────────────────────────────────────────${RESET}"
   echo ""
 }
@@ -195,22 +195,40 @@ main() {
   echo ""
 
   if [[ "$session_type" == "wayland" && "$HAVE_PLAYERCTL" == "0" ]]; then
-    echo -e "${MAGENTA}  ⚠ Wayland session detected without playerctl — xdotool/wmctrl${RESET}"
+    echo -e "${MAGENTA}  ⚠ Wayland session detected without playerctl  xdotool/wmctrl${RESET}"
     echo -e "${MAGENTA}    can't see window titles under Wayland, so detection will${RESET}"
     echo -e "${MAGENTA}    likely never work. Install playerctl: sudo apt install playerctl${RESET}"
     echo ""
   elif [[ "$session_type" == "wayland" ]]; then
-    echo -e "${DIM}  Wayland session — using playerctl (MPRIS) for detection.${RESET}"
+    echo -e "${DIM}  Wayland session  using playerctl (MPRIS) for detection.${RESET}"
     echo ""
   fi
 
   local last_title=""
+  local fetch_pid=""
+
+
+  cleanup() {
+    if [[ -n "$fetch_pid" ]] && kill -0 "$fetch_pid" 2>/dev/null; then
+      kill "$fetch_pid" 2>/dev/null
+    fi
+    echo -e "\n${DIM}  Stopped.${RESET}"
+    exit 0
+  }
+  trap cleanup INT TERM
 
   while true; do
     local current_title
     current_title=$(get_youtube_title)
 
     if [[ -n "$current_title" && "$current_title" != "$last_title" ]]; then
+
+      if [[ -n "$fetch_pid" ]] && kill -0 "$fetch_pid" 2>/dev/null; then
+        debug "Song changed — stopping previous lyrics display (pid $fetch_pid)"
+        kill "$fetch_pid" 2>/dev/null
+        wait "$fetch_pid" 2>/dev/null
+      fi
+
       last_title="$current_title"
       show_banner
       echo -e "${MAGENTA}  ┌─ DETECTED ────────────────────────────────────────────┐${RESET}"
@@ -218,14 +236,14 @@ main() {
       echo -e "${MAGENTA}  └───────────────────────────────────────────────────────┘${RESET}"
       echo ""
       fetch_and_display_lyrics "$current_title" &
-      local fetch_pid=$!
-      spinner $fetch_pid
-      wait $fetch_pid
+      fetch_pid=$!
+
     elif [[ -z "$current_title" ]]; then
-      printf "\r${DIM}  ♪ No YouTube music detected... waiting${RESET}   "
+      printf "\r${DIM}  No YouTube music detected... waiting${RESET}   "
     fi
 
-    sleep 5
+
+    sleep 1
   done
 }
 
