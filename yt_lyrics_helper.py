@@ -21,7 +21,6 @@ DIM     = "\033[2m"
 WHITE   = "\033[97m"
 BLUE    = "\033[38;5;75m"
 
-# Set YT_LYRICS_DEBUG=1 in your environment to see what's happening under the hood
 DEBUG = os.environ.get("YT_LYRICS_DEBUG", "") == "1"
 
 def debug(msg):
@@ -33,7 +32,6 @@ def clean_title(title):
     don't accidentally chew into real words (e.g. an artist with 'HD' in it)."""
     original = title
 
-    # Remove bracketed/parenthesized noise first (these are safe — whole groups)
     bracket_noise = [
         r'\(Official.*?\)', r'\[Official.*?\]',
         r'\(Lyrics.*?\)', r'\[Lyrics.*?\]',
@@ -45,16 +43,13 @@ def clean_title(title):
     for pattern in bracket_noise:
         title = re.sub(pattern, '', title, flags=re.IGNORECASE)
 
-    # Remove trailing junk after a full-width pipe, e.g. "Song｜Channel Name"
     title = re.sub(r'｜.*$', '', title)
 
-    # Remove standalone noise words, but ONLY as whole words (\b boundaries)
-    # so we don't strip letters out of the middle of real words/names.
+ 
     word_noise = [r'MV', r'M/V', r'HD', r'HQ', r'4K', r'Official']
     for word in word_noise:
         title = re.sub(rf'\b{word}\b', '', title, flags=re.IGNORECASE)
 
-    # Collapse leftover punctuation/whitespace from removed bits
     title = re.sub(r'\s{2,}', ' ', title)
     title = re.sub(r'^[\s\-\|]+|[\s\-\|]+$', '', title)
     title = title.strip()
@@ -94,9 +89,21 @@ def is_player_playing():
         )
         return result.stdout.strip() == "Playing"
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None  # unknown — don't block on this
+        return None  
 
 
+    """Parse LRC format into list of (seconds, line) tuples."""
+    lines = []
+    pattern = re.compile(r'\[(\d+):(\d+)\.(\d+)\](.*)')
+    for raw in lrc_text.split('\n'):
+        m = pattern.match(raw.strip())
+        if m:
+            minutes, seconds, centiseconds, text = m.groups()
+            total = int(minutes)*60 + int(seconds) + int(centiseconds)/100
+            lines.append((total, text.strip()))
+    return sorted(lines, key=lambda x: x[0])
+
+def parse_lrc(lrc_text):
     """Parse LRC format into list of (seconds, line) tuples."""
     lines = []
     pattern = re.compile(r'\[(\d+):(\d+)\.(\d+)\](.*)')
@@ -128,7 +135,6 @@ def display_synced(lrc_lines):
             if use_playerctl:
                 pos = get_player_position()
                 if pos is None:
-                    # playerctl briefly unavailable — hold last known position
                     time.sleep(0.3)
                     continue
                 elapsed = pos
@@ -164,8 +170,6 @@ def display_synced(lrc_lines):
             if current_idx >= len(lrc_lines) - 1:
                 break
 
-            # Poll fairly often so pauses/seeks are picked up quickly,
-            # without hammering playerctl.
             time.sleep(0.3 if use_playerctl else 0.5)
     except KeyboardInterrupt:
         print(f"\n{DIM}  Stopped.{RESET}")
@@ -194,7 +198,6 @@ def try_search(query):
     debug(f"Searching syncedlyrics for: '{query}'")
     try:
         try:
-            # Current API: prefer synced lyrics but accept plain ones too
             result = syncedlyrics.search(query)
         except TypeError as e:
             debug(f"search() call failed ({e}); retrying with allow_plain_format")
@@ -227,15 +230,12 @@ def main():
         return
 
     try:
-        # First attempt: cleaned title as-is
         lrc = try_search(title)
 
-        # Second attempt: normalize "Artist - Song" / "Song - Artist" hyphens
         if not lrc and ' - ' in title:
             alt_query = normalize_for_search(title)
             lrc = try_search(alt_query)
 
-        # Third attempt: original raw title, in case cleaning over-stripped it
         if not lrc:
             debug("Falling back to raw (uncleaned) title")
             lrc = try_search(raw_title)
