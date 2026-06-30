@@ -1,9 +1,7 @@
-#!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_HELPER="$SCRIPT_DIR/yt_lyrics_helper.py"
 
-# Set YT_LYRICS_DEBUG=1 to see what window/title detection is doing
 DEBUG="${YT_LYRICS_DEBUG:-0}"
 
 RESET='\033[0m'
@@ -33,7 +31,6 @@ check_dependencies() {
     missing+=("playerctl")
   fi
 
-  # xdotool/wmctrl are now just a fallback for X11, not required
   if ! command -v xdotool >/dev/null 2>&1 && ! command -v wmctrl >/dev/null 2>&1; then
     debug "Neither xdotool nor wmctrl found — window-title fallback unavailable"
   fi
@@ -68,9 +65,7 @@ show_banner() {
 }
 
 get_youtube_title_playerctl() {
-  # MPRIS works over D-Bus, independent of X11/Wayland. Most browsers (Chrome,
-  # Brave, Firefox, Edge) register a media player session when audio/video is
-  # playing on a page — including YouTube.
+
   local status
   status=$(playerctl status 2>/dev/null)
   debug "playerctl status: '$status'"
@@ -88,9 +83,6 @@ get_youtube_title_playerctl() {
     return
   fi
 
-  # If the title already looks like "Artist - Song" (common for "Lyrics" /
-  # "Audio" upload videos), don't prepend the channel-name artist field too —
-  # that just produces "ChannelName - Artist - Song" garbage.
   if [[ "$player_title" == *" - "* ]]; then
     debug "Title already contains ' - ', using as-is (ignoring artist field '$player_artist')"
     echo "$player_title"
