@@ -1,0 +1,12 @@
+services:
+  yt-lyrics:
+    build: .
+    environment:
+      - YT_LYRICS_DEBUG=${YT_LYRICS_DEBUG:-0}
+      - DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS}
+    volumes:
+   
+      - /run/user/${UID:-1000}/bus:/run/user/${UID:-1000}/bus
+    network_mode: host
+    stdin_open: true
+    tty: true
